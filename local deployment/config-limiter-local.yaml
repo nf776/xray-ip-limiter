@@ -1,0 +1,8 @@
+nats:
+  # DO NOT CHANGE IF YOU DON'T UNDERSTAND WHAT WHIS FIELD DO!
+  url: "nats://nats:4222"
+  token: "CHANGE_ME" # CHANGE TOKEN ON MAIN SERVER AND NODES!!!
+
+service:
+  ip_limit: 2
+  ban_duration: "30s" # e.g. 30s 3h 1d

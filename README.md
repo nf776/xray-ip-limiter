@@ -79,18 +79,73 @@
 
 ## Настройка
 
-### Настройки главного сервиса
+### Настройки главного сервера
 ```yaml
-# config.yaml в папке с docker-compose главного сервиса
+# config.yaml в папке с docker-compose главного сервера
 nats:
   # НЕ МЕНЯТЬ ЕСЛИ СЕРВИС ЗАПУСКАЕТСЯ ЛОКАЛЬНО С NATS!
   url: "nats://nats:4222"
-  token: "CHANGE_ME" # Установите токен в конфиге и docker compose, а так же на всех нодах
+
+  # Установите токен в конфиге и docker compose, а так же на всех нодах
+  token: "CHANGE_ME" 
 
 service:
   ip_limit: 2
   ban_duration: "30s" # e.g. 30s 3h 1d
 ```
+
+<details>
+<summary>docker-compose.yaml</summary>
+```yaml
+services:
+  nats:
+    image: nats:latest
+    container_name: "xray-ip-limiter-nats"
+    ports:
+      - "4222:4222"
+    command: ["-js", "--auth", "CHANGE_ME"] # Установите токен из конфига вместо CHANGE_ME!
+    networks:
+      - observer
+    volumes:
+      - nats-data:/data
+
+  redis:
+    image: valkey/valkey:8.0
+    container_name: xray-ip-limiter-redis
+    restart: always
+    volumes:
+      - redis-data:/data
+    networks:
+      - observer
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  xray-ip-limiter:
+    image: ghcr.io/nf776/xray-ip-limiter:latest
+    container_name: xray-ip-limiter
+    restart: always
+    depends_on:
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_started
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    networks:
+      - observer
+
+networks:
+  observer:
+    driver: bridge
+
+volumes:
+  redis-data:
+  nats-data:
+```
+</details>
 
 ### Настройка агента
 ```yaml
@@ -102,10 +157,62 @@ nats:
   url: "1.2.3.4:4222" # IP сервера, на котором запущен главный сервис. Порт NATS по умолчанию - 4222
   token: CHANGE_ME # Установите тот же токен, что вы ставили на главном сервисе
 ```
+### Настройки агента на ноде
+```
+# config.yaml в папке с docker-compose агента
+node_id: "node-us-4" # Установите уникальный ID ноды
+log_path: "/var/log/remnanode/access.log" # ВНИМАНИЕ! При смене пути файла лога необходимо прокинуть новый путь в docker compose!
+
+nats:
+  url: "1.2.3.4:4222" # IP сервера, на котором запущен главный сервис. Порт NATS по умолчанию - 4222
+  token: CHANGE_ME # Установите тот же токен, что вы ставили на главном сервисе
+```
+
+<details>
+<summary>docker-compose.yaml на ноде</summary>
+```
+services:
+  xray-ip-limiter-agent:
+    image: ghcr.io/nf776/xray-ip-limiter-agent:latest
+    container_name: xray-ip-limiter-agent
+    restart: always
+    network_mode: "host"
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - /var/log/remnanode:/var/log/remnanode
+```
+</details>
 
 ## Быстрый старт
 
-...
+### Главный сервер
+
+```bash
+cd /opt && mkdir xray-ip-limiter && cd xray-ip-limiter
+touch docker-compose.yaml config.yaml
+nano docker-compose.yaml
+nano config.yaml
+
+docker compose up -d && docker compose logs -f
+```
+
+Настройте config.yaml и docker-compose.yaml согласно шаблонам выше
+
+### Нода
+
+```bash
+cd /opt && mkdir xray-ip-limiter-agent && cd xray-ip-limiter-agent
+touch docker-compose.yaml config.yaml
+nano docker-compose.yaml
+nano config.yaml
+
+docker compose up -d && docker compose logs -f
+```
+
+Настройте config.yaml и docker-compose.yaml согласно шаблонам выше
 
 ## Производительность
 

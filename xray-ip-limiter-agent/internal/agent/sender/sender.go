@@ -55,7 +55,7 @@ func NewNATSClient(cfg config.NATSConfig, nodeID string) (*NATSClient, error) {
 		Storage:   nats.FileStorage,
 		MaxMsgs:   100000,
 		MaxAge:    24 * time.Hour,
-		Retention: nats.WorkQueuePolicy,
+		Retention: nats.InterestPolicy,
 	}
 
 	_, err = js.AddStream(streamConfig)

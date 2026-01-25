@@ -27,9 +27,7 @@ func initFirewall() error {
 
 	delete := exec.Command("ipset", "destroy", "blacklist")
 	output, err := delete.CombinedOutput()
-	if strings.Contains(string(output), "it is in use by a kernel component") {
-		slog.Info("Ipset already exists, skip")
-	} else {
+	if !strings.Contains(string(output), "it is in use by a kernel component") || strings.Contains(string(output), "does not exist") {
 		if err != nil {
 			slog.Error("failed to delete ipset", logger.Err(err), slog.String("output", string(output)))
 			return err

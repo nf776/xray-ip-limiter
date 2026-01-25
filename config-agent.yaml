@@ -1,0 +1,6 @@
+node_id: "node-us-4" # SET NODE ID
+log_path: "/var/log/remnanode/access.log"
+
+nats:
+  url: "1.2.3.4:4222" # SET YOUR MAIN OBSERVER IP
+  token: CHANGE_ME

@@ -1,0 +1,47 @@
+services:
+  nats:
+    image: nats:latest
+    container_name: "xray-ip-limiter-nats"
+    ports:
+      - "4222:4222"
+    command: ["-js", "--auth", "CHANGE_ME"] # SET YOUR AUTH TOKEN HERE AND IN CONFIG!
+    networks:
+      - observer
+    volumes:
+      - nats-data:/data
+
+  redis:
+    image: valkey/valkey:8.0
+    container_name: xray-ip-limiter-redis
+    restart: always
+    volumes:
+      - redis-data:/data
+    networks:
+      - observer
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  xray-ip-limiter:
+    build: .
+    container_name: xray-ip-limiter
+    restart: always
+    depends_on:
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_started
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    networks:
+      - observer
+
+networks:
+  observer:
+    driver: bridge
+
+volumes:
+  redis-data:
+  nats-data:

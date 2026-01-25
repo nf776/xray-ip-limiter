@@ -64,9 +64,6 @@ func (p *LogParser) Start(ctx context.Context, handler func(models.LogEntry)) er
 				continue
 			}
 
-			if entry.Email != "1" {
-				continue
-			}
 			handler(*entry)
 		}
 	}

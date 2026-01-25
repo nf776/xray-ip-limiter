@@ -66,7 +66,7 @@ func NewNATSClient(cfg config.NATSConfig, nodeID string) (*NATSClient, error) {
 		}
 	}
 
-	durableName := "agent-block-consumer"
+	durableName := "agent-block-" + nodeID
 	_, _ = js.AddConsumer("OBSERVER_STREAM", &nats.ConsumerConfig{
 		Durable:       durableName,
 		FilterSubject: "xray-observer-block",
@@ -91,7 +91,7 @@ func (n *NATSClient) Send(entry models.LogEntry) {
 func (n *NATSClient) Start(ctx context.Context) error {
 	blockSub, err := n.js.PullSubscribe(
 		"xray-observer-block",
-		"agent-block-consumer",
+		"agent-block-"+n.nodeID,
 		nats.BindStream("OBSERVER_STREAM"),
 	)
 	if err != nil {

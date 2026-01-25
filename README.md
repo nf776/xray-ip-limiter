@@ -96,6 +96,7 @@ service:
 
 <details>
 <summary>docker-compose.yaml</summary>
+
 ```yaml
 services:
   nats:
@@ -145,6 +146,7 @@ volumes:
   redis-data:
   nats-data:
 ```
+
 </details>
 
 ### Настройка агента
@@ -170,6 +172,7 @@ nats:
 
 <details>
 <summary>docker-compose.yaml на ноде</summary>
+
 ```
 services:
   xray-ip-limiter-agent:
@@ -184,6 +187,7 @@ services:
       - ./config.yaml:/app/config.yaml:ro
       - /var/log/remnanode:/var/log/remnanode
 ```
+
 </details>
 
 ## Быстрый старт

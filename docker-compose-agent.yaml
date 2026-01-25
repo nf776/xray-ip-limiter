@@ -1,6 +1,6 @@
 services:
   xray-ip-limiter-agent:
-    build: .
+    image: ghcr.io/nf776/xray-ip-limiter-agent:latest
     container_name: xray-ip-limiter-agent
     restart: always
     network_mode: "host"

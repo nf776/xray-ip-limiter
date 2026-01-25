@@ -25,7 +25,7 @@ services:
       retries: 5
 
   xray-ip-limiter:
-    build: .
+    image: ghcr.io/nf776/xray-ip-limiter:latest
     container_name: xray-ip-limiter
     restart: always
     depends_on:

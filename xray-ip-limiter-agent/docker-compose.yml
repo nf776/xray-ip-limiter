@@ -1,0 +1,12 @@
+services:
+  xray-ip-limiter-agent:
+    build: .
+    container_name: xray-ip-limiter-agent
+    restart: always
+    network_mode: "host"
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - /var/log/remnanode:/var/log/remnanode

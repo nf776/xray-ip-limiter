@@ -1,6 +1,10 @@
-node_id: "node-us-4" # SET NODE ID
-log_path: "/var/log/remnanode/access.log"
+# config.yaml в папке с docker-compose агента
+node_id: "node-us-4" # Установите уникальный ID ноды
+log_path: "/var/log/remnanode/access.log" # ВНИМАНИЕ! При смене пути файла лога необходимо прокинуть новый путь в docker compose!
 
 nats:
-  url: "1.2.3.4:4222" # SET YOUR MAIN OBSERVER IP
-  token: CHANGE_ME
+  url: "1.2.3.4:4222" # IP сервера, на котором запущен главный сервис. Порт NATS по умолчанию - 4222
+  token: CHANGE_ME # Установите тот же токен, что вы ставили на главном сервисе
+
+debug:
+  disable_block: false # Возможность отключения блокировок на агенте

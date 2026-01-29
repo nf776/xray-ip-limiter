@@ -5,6 +5,7 @@ go 1.25.3
 require (
 	github.com/fatih/color v1.18.0
 	github.com/ilyakaznacheev/cleanenv v1.5.0
+	github.com/k0kubun/pp v3.0.1+incompatible
 	github.com/nats-io/nats.go v1.48.0
 	github.com/nxadm/tail v1.4.11
 )
@@ -13,6 +14,7 @@ require (
 	github.com/BurntSushi/toml v1.2.1 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
+	github.com/k0kubun/colorstring v0.0.0-20150214042306-9440f1994b88 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect

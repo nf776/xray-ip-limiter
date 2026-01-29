@@ -2,6 +2,10 @@ package usecase
 
 import "context"
 
+type BlockPublisher interface {
+	PublishBlock(ctx context.Context, cmd BlockCommandOutput) error
+}
+
 type Notifier interface {
 	NotifyLimitExceeded(ctx context.Context, userID string, ips []string) error
 	NotifyStartup(ctx context.Context) error

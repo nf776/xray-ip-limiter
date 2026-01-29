@@ -1,15 +1,15 @@
-package models
+package usecase
 
 import "time"
 
-type LogEntry struct {
+type IPEventInput struct {
+	UserID    string    `json:"user_id"`
 	IP        string    `json:"ip"`
-	Email     string    `json:"user_id"`
 	NodeID    string    `json:"node_id"`
 	Timestamp time.Time `json:"timestamp"`
 }
 
-type BlockCommand struct {
+type BlockCommandOutput struct {
 	UserID     string    `json:"user_id"`
 	BlockedIPs []string  `json:"blocked_ips"`
 	Action     string    `json:"action"`

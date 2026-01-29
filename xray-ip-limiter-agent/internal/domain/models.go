@@ -1,10 +1,10 @@
-package models
+package domain
 
 import "time"
 
-type UserIPEvent struct {
-	UserID    string    `json:"user_id"`
+type LogEntry struct {
 	IP        string    `json:"ip"`
+	Email     string    `json:"user_id"`
 	NodeID    string    `json:"node_id"`
 	Timestamp time.Time `json:"timestamp"`
 }

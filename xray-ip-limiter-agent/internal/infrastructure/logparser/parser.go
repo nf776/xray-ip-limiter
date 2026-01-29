@@ -1,4 +1,4 @@
-package parser
+package logparser
 
 import (
 	"context"
@@ -6,29 +6,32 @@ import (
 	"regexp"
 	"strings"
 	"time"
-	"xray-ip-limiter-agent/internal/agent/models"
+
+	"xray-ip-limiter-agent/internal/domain"
 
 	"github.com/nxadm/tail"
 )
 
+var _ domain.LogParser = (*TailParser)(nil)
+
 var logRegex = regexp.MustCompile(`^(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}\.\d+) from (?:tcp:)?(\d+\.\d+\.\d+\.\d+):\d+ accepted .* email: (.+)$`)
 
-type LogParser struct {
+type TailParser struct {
 	logPath string
 	nodeID  string
 	tail    *tail.Tail
 	stopCh  chan struct{}
 }
 
-func NewLogParser(logPath, nodeID string) *LogParser {
-	return &LogParser{
+func NewTailParser(logPath, nodeID string) *TailParser {
+	return &TailParser{
 		logPath: logPath,
 		nodeID:  nodeID,
 		stopCh:  make(chan struct{}),
 	}
 }
 
-func (p *LogParser) Start(ctx context.Context, handler func(models.LogEntry)) error {
+func (p *TailParser) Start(ctx context.Context, handler func(domain.LogEntry)) error {
 	t, err := tail.TailFile(p.logPath, tail.Config{
 		Follow:   true,
 		ReOpen:   true,
@@ -69,7 +72,14 @@ func (p *LogParser) Start(ctx context.Context, handler func(models.LogEntry)) er
 	}
 }
 
-func (p *LogParser) parseLine(line string) (*models.LogEntry, error) {
+func (p *TailParser) Stop() {
+	if p.tail != nil {
+		p.tail.Stop()
+	}
+	close(p.stopCh)
+}
+
+func (p *TailParser) parseLine(line string) (*domain.LogEntry, error) {
 	matches := logRegex.FindStringSubmatch(line)
 	if matches == nil {
 		return nil, fmt.Errorf("no match")
@@ -77,7 +87,7 @@ func (p *LogParser) parseLine(line string) (*models.LogEntry, error) {
 
 	timestamp, _ := time.Parse("2006/01/02 15:04:05", matches[1][:19])
 
-	return &models.LogEntry{
+	return &domain.LogEntry{
 		Timestamp: timestamp,
 		IP:        matches[2],
 		Email:     strings.TrimSpace(matches[3]),
@@ -85,13 +95,6 @@ func (p *LogParser) parseLine(line string) (*models.LogEntry, error) {
 	}, nil
 }
 
-func (p *LogParser) isLocalIP(ip string) bool {
+func (p *TailParser) isLocalIP(ip string) bool {
 	return strings.HasPrefix(ip, "127.") || ip == "::1" || ip == "0.0.0.0"
-}
-
-func (p *LogParser) Stop() {
-	if p.tail != nil {
-		p.tail.Stop()
-	}
-	close(p.stopCh)
 }

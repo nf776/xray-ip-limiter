@@ -5,128 +5,91 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"os/exec"
 	"os/signal"
-	"strings"
-	"sync"
-	"xray-ip-limiter-agent/internal/agent/models"
-	"xray-ip-limiter-agent/internal/agent/parser"
-	"xray-ip-limiter-agent/internal/agent/sender"
-	"xray-ip-limiter-agent/internal/config"
+
+	"xray-ip-limiter-agent/internal/infrastructure/config"
+	"xray-ip-limiter-agent/internal/infrastructure/firewall"
+	"xray-ip-limiter-agent/internal/infrastructure/logparser"
+	"xray-ip-limiter-agent/internal/infrastructure/messaging"
+	"xray-ip-limiter-agent/internal/usecase"
 	"xray-ip-limiter-agent/internal/utils/logger"
 )
 
 type App struct {
-	cfg    *config.Config
-	parser *parser.LogParser
-	sender *sender.NATSClient
+	cfg        *config.Config
+	natsClient *messaging.NATSClient
+	agent      *usecase.Agent
+	blocker    *firewall.IPSetBlocker
+	parser     *logparser.TailParser
 }
 
-func initFirewall() error {
-	slog.Info("Initializing firewall rules...")
-
-	delete := exec.Command("ipset", "destroy", "blacklist")
-	output, err := delete.CombinedOutput()
-	if !strings.Contains(string(output), "it is in use by a kernel component") || strings.Contains(string(output), "does not exist") {
-		if err != nil {
-			slog.Error("failed to delete ipset", logger.Err(err), slog.String("output", string(output)))
-			return err
-		}
-	}
-
-	create := exec.Command("ipset", "create", "blacklist", "hash:ip", "timeout", "0")
-	output, err = create.CombinedOutput()
-	if !strings.Contains(string(output), "set with the same name already exists") {
-		if err != nil {
-			slog.Error("failed to create ipset", logger.Err(err), slog.String("output", string(output)))
-			return err
-		}
-	}
-
-	check := exec.Command("iptables", "-C", "INPUT", "-m", "set", "--match-set", "blacklist", "src", "-j", "DROP")
-	if err := check.Run(); err != nil {
-		add := exec.Command("iptables", "-I", "INPUT", "-m", "set", "--match-set", "blacklist", "src", "-j", "DROP")
-		if err := add.Run(); err != nil {
-			slog.Error("failed to add iptables rule", logger.Err(err))
-			return err
-		}
-	}
-
-	return nil
-}
-
-func Init() error {
+func Run() error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
-
-	initFirewall()
 
 	cfg := config.MustLoad()
 
 	logger.SetupLogger()
 
-	app, err := New(cfg)
-	if err != nil {
-		return err
+	blocker := firewall.NewIPSetBlocker(cfg.Debug.DisableBlock)
+	if err := blocker.Init(); err != nil {
+		slog.Warn("firewall init failed, continuing anyway", slog.String("error", err.Error()))
 	}
 
-	return app.Run(ctx)
+	app, err := New(cfg, blocker)
+	if err != nil {
+		return fmt.Errorf("failed to create app: %w", err)
+	}
+	defer app.Shutdown()
+
+	return app.Start(ctx)
 }
 
-func New(cfg *config.Config) (*App, error) {
-	natsPub, err := sender.NewNATSClient(cfg.NATS, cfg.NodeID)
+func New(cfg *config.Config, blocker *firewall.IPSetBlocker) (*App, error) {
+	natsClient, err := messaging.NewNATSClient(messaging.NATSClientConfig{
+		URL:    cfg.NATS.URL,
+		Token:  cfg.NATS.Token,
+		NodeID: cfg.NodeID,
+	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to init nats: %w", err)
 	}
+	slog.Info("Connected to NATS")
 
-	logParser := parser.NewLogParser(
-		cfg.LogPath,
-		cfg.NodeID,
+	publisher := messaging.NewNATSPublisher(natsClient.JetStream())
+
+	subscriber := messaging.NewNATSSubscriber(natsClient.JetStream(), cfg.NodeID)
+
+	parser := logparser.NewTailParser(cfg.LogPath, cfg.NodeID)
+
+	agent := usecase.NewAgent(
+		parser,
+		publisher,
+		subscriber,
+		blocker,
 	)
 
 	return &App{
-		cfg:    cfg,
-		parser: logParser,
-		sender: natsPub,
+		cfg:        cfg,
+		natsClient: natsClient,
+		agent:      agent,
+		blocker:    blocker,
+		parser:     parser,
 	}, nil
 }
 
-func (a *App) Run(ctx context.Context) error {
+func (a *App) Start(ctx context.Context) error {
 	slog.Info("Xray IP Limiter Agent started",
-		"node_id", a.cfg.NodeID,
-		"log_path", a.cfg.LogPath,
+		slog.String("node_id", a.cfg.NodeID),
+		slog.String("log_path", a.cfg.LogPath),
 	)
 
-	var wg sync.WaitGroup
-	errChan := make(chan error, 2)
+	return a.agent.Run(ctx)
+}
 
-	wg.Go(func() {
-		if err := a.sender.Start(ctx); err != nil {
-			errChan <- fmt.Errorf("sender error: %w", err)
-		}
-	})
-
-	wg.Go(func() {
-		handler := func(entry models.LogEntry) {
-			a.sender.Send(entry)
-		}
-
-		if err := a.parser.Start(ctx, handler); err != nil {
-			errChan <- fmt.Errorf("parser error: %w", err)
-		}
-	})
-
-	select {
-	case <-ctx.Done():
-		slog.Info("shutting down gracefully...")
-	case err := <-errChan:
-		slog.Error("application error", logger.Err(err))
-		return err
+func (a *App) Shutdown() {
+	if a.natsClient != nil {
+		a.natsClient.Close()
 	}
-
-	a.parser.Stop()
-
-	wg.Wait()
-
-	return nil
+	slog.Info("Agent stopped")
 }

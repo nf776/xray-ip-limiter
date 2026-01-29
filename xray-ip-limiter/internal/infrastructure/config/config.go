@@ -9,13 +9,14 @@ import (
 )
 
 type Config struct {
-	NATSConfig NATSConfig    `yaml:"nats"`
-	Redis      RedisConfig   `yaml:"redis"`
-	Service    ServiceConfig `yaml:"service"`
+	NATS     NATSConfig     `yaml:"nats"`
+	Redis    RedisConfig    `yaml:"redis"`
+	Service  ServiceConfig  `yaml:"service"`
+	Telegram TelegramConfig `yaml:"telegram"`
 }
 
 type NATSConfig struct {
-	Url          string `yaml:"url" env-default:"nats://nats:4222"`
+	URL          string `yaml:"url" env-default:"nats://nats:4222"`
 	Token        string `yaml:"token" env-required:"true"`
 	WorkersCount int    `yaml:"workers_count" env-default:"3"`
 }
@@ -31,8 +32,14 @@ type ServiceConfig struct {
 	BanDuration time.Duration `yaml:"ban_duration" env-default:"1m"`
 }
 
+type TelegramConfig struct {
+	Enabled  bool   `yaml:"enabled" env-default:"false"`
+	BotToken string `yaml:"bot_token"`
+	ChatID   string `yaml:"chat_id"`
+}
+
 func MustLoad() *Config {
-	configPath := "/app/config.yaml"
+	configPath := getConfigPath()
 
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		panic(fmt.Sprintf("config file not found: %s", configPath))
@@ -44,4 +51,11 @@ func MustLoad() *Config {
 	}
 
 	return &cfg
+}
+
+func getConfigPath() string {
+	if path := os.Getenv("CONFIG_PATH"); path != "" {
+		return path
+	}
+	return "/app/config.yaml"
 }

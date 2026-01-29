@@ -11,6 +11,7 @@ import (
 	"xray-ip-limiter/internal/nats"
 	"xray-ip-limiter/internal/processor"
 	"xray-ip-limiter/internal/storage"
+	"xray-ip-limiter/internal/infrastructure/notification"
 	"xray-ip-limiter/internal/utils/logger"
 )
 
@@ -19,6 +20,7 @@ type App struct {
 	redis     *storage.RedisClient
 	processor *processor.IPProcessor
 	reader    *nats.NATSClient
+	notifier   *notification.TelegramNotifier
 }
 
 func Init() error {
@@ -46,13 +48,18 @@ func New(cfg *config.Config) (*App, error) {
 
 	proc := processor.NewIPProcessor(redisClient, cfg.Service)
 
-	natsReader := nats.NewNATSClient(cfg.NATSConfig, proc)
+	notifier := notification.NewTelegramNotifier(notification.TelegramConfig{
+		Enabled:  cfg.Telegram.Enabled,
+		BotToken: cfg.Telegram.BotToken,
+		ChatID:   cfg.Telegram.ChatID,
+	})
 
 	return &App{
 		cfg:       cfg,
 		redis:     redisClient,
 		processor: proc,
 		reader:    natsReader,
+		notifier:   notifier,
 	}, nil
 }
 
@@ -63,6 +70,9 @@ func (a *App) Run(ctx context.Context) error {
 		slog.Float64("ban_duration", a.cfg.Service.BanDuration.Seconds()),
 	)
 
+	if err := a.notifier.NotifyStartup(ctx); err != nil {
+		slog.Error("failed to send startup notification", slog.String("error", err.Error()))
+	}
 	var wg sync.WaitGroup
 	errChan := make(chan error, 2)
 

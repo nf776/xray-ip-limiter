@@ -23,7 +23,7 @@ type App struct {
 	parser     *logparser.TailParser
 }
 
-func Run() error {
+func Run(version string) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
@@ -42,7 +42,7 @@ func Run() error {
 	}
 	defer app.Shutdown()
 
-	return app.Start(ctx)
+	return app.Start(ctx, version)
 }
 
 func New(cfg *config.Config, blocker *firewall.IPSetBlocker) (*App, error) {
@@ -78,8 +78,9 @@ func New(cfg *config.Config, blocker *firewall.IPSetBlocker) (*App, error) {
 	}, nil
 }
 
-func (a *App) Start(ctx context.Context) error {
+func (a *App) Start(ctx context.Context, version string) error {
 	slog.Info("Xray IP Limiter Agent started",
+		slog.String("version", version),
 		slog.String("node_id", a.cfg.NodeID),
 		slog.String("log_path", a.cfg.LogPath),
 	)

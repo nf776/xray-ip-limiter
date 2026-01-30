@@ -24,7 +24,7 @@ type App struct {
 	notifier   *notification.TelegramNotifier
 }
 
-func Run() error {
+func Run(version string) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
@@ -38,7 +38,7 @@ func Run() error {
 	}
 	defer app.Shutdown()
 
-	return app.Start(ctx)
+	return app.Start(ctx, version)
 }
 
 func New(cfg *config.Config) (*App, error) {
@@ -103,9 +103,10 @@ func New(cfg *config.Config) (*App, error) {
 	}, nil
 }
 
-func (a *App) Start(ctx context.Context) error {
+func (a *App) Start(ctx context.Context, version string) error {
 	slog.Info(
 		"IP Limiter started",
+		slog.String("version", version),
 		slog.Int("ip_limit", a.cfg.Service.IPLimit),
 		slog.Float64("ban_duration_sec", a.cfg.Service.BanDuration.Seconds()),
 	)

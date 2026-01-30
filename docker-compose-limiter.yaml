@@ -2,6 +2,7 @@ services:
   nats:
     image: nats:latest
     container_name: "xray-ip-limiter-nats"
+    restart: always
     ports:
       - "4222:4222"
     command: ["-js", "--auth", "CHANGE_ME"] # SET YOUR AUTH TOKEN HERE AND IN CONFIG!

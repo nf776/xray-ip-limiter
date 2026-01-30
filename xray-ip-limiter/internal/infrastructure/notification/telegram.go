@@ -42,16 +42,21 @@ func (t *TelegramNotifier) NotifyStartup(ctx context.Context) error {
 	return t.sendMessage(ctx, message)
 }
 
-func (t *TelegramNotifier) NotifyLimitExceeded(ctx context.Context, userID string, ips []string) error {
+func (t *TelegramNotifier) NotifyLimitExceeded(
+	ctx context.Context,
+	userID string,
+	ips []string,
+	violationDuration string,
+) error {
 	if !t.cfg.Enabled {
 		return nil
 	}
 
-	message := t.formatMessage(userID, ips)
+	message := t.formatMessage(userID, ips, violationDuration)
 	return t.sendMessage(ctx, message)
 }
 
-func (t *TelegramNotifier) formatMessage(userID string, ips []string) string {
+func (t *TelegramNotifier) formatMessage(userID string, ips []string, violationDuration string) string {
 	var sb strings.Builder
 	sb.WriteString("🚫 <b>IP Limit Exceeded</b>\n\n")
 	sb.WriteString(fmt.Sprintf("<b>User ID:</b> <code>%s</code>\n", userID))
@@ -60,6 +65,7 @@ func (t *TelegramNotifier) formatMessage(userID string, ips []string) string {
 	for _, ip := range ips {
 		sb.WriteString(fmt.Sprintf("• <code>%s</code>\n", ip))
 	}
+	sb.WriteString(fmt.Sprintf("Violation duration: %s", violationDuration))
 	return sb.String()
 }
 

@@ -74,6 +74,7 @@ func New(cfg *config.Config) (*App, error) {
 	ipLimiter := usecase.NewIPLimiter(
 		redisRepo,
 		redisRepo,
+		redisRepo,
 		publisher,
 		notifier,
 		usecase.IPLimiterConfig{

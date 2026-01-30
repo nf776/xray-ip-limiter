@@ -3,6 +3,7 @@ package persistence
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"xray-ip-limiter/internal/domain/repository"
@@ -12,6 +13,7 @@ import (
 
 var _ repository.SessionRepository = (*RedisRepository)(nil)
 var _ repository.LockRepository = (*RedisRepository)(nil)
+var _ repository.ViolationRepository = (*RedisRepository)(nil)
 
 type RedisConfig struct {
 	Addr     string
@@ -77,6 +79,46 @@ func (r *RedisRepository) ReleaseLock(ctx context.Context, key string) error {
 	return r.client.Del(ctx, key).Err()
 }
 
+func (r *RedisRepository) SetViolationStart(ctx context.Context, userID string, ttl time.Duration) (bool, error) {
+	key := r.buildViolationKey(userID)
+	now := time.Now().Unix()
+
+	set, err := r.client.SetNX(ctx, key, now, ttl).Result()
+	if err != nil {
+		return false, fmt.Errorf("failed to set violation start: %w", err)
+	}
+
+	return !set, nil
+}
+
+func (r *RedisRepository) GetViolationStart(ctx context.Context, userID string) (time.Time, bool, error) {
+	key := r.buildViolationKey(userID)
+
+	val, err := r.client.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return time.Time{}, false, nil
+	}
+	if err != nil {
+		return time.Time{}, false, fmt.Errorf("failed to get violation start: %w", err)
+	}
+
+	timestamp, err := strconv.ParseInt(val, 10, 64)
+	if err != nil {
+		return time.Time{}, false, fmt.Errorf("failed to parse violation timestamp: %w", err)
+	}
+
+	return time.Unix(timestamp, 0), true, nil
+}
+
+func (r *RedisRepository) ClearViolationStart(ctx context.Context, userID string) error {
+	key := r.buildViolationKey(userID)
+	return r.client.Del(ctx, key).Err()
+}
+
 func (r *RedisRepository) buildUserIPsKey(userID string) string {
 	return fmt.Sprintf("user:%s:ips", userID)
+}
+
+func (r *RedisRepository) buildViolationKey(userID string) string {
+	return fmt.Sprintf("user:%s:violation", userID)
 }

@@ -79,7 +79,12 @@
 
 ## Настройка
 
+> **Полные файлы config.yaml для обсервера и агента со всеми переменными вы можете посмотреть напрямую в файлах проекта**
+
 ### Настройки главного сервера
+
+#### Основные настройки
+
 ```yaml
 # config.yaml в папке с docker-compose главного сервера
 nats:
@@ -88,12 +93,42 @@ nats:
 
 service:
   ip_limit: 2
-  ban_duration: "30s" # e.g. 30s 3h 1d
 
+  # Стандартно стоит 30 секунд, что позволяет сразу блокировать все IP нарушителя и так же оперативно снимать блокировку после окончания нарушения
+  ban_duration: "30s" # e.g. 30s 3h 1d 
+
+# Telegram оповещения при старте и блокировке
 telegram:
   enabled: true
   bot_token: ""
   chat_id: ""
+
+```
+
+#### Интеграция с Remnawave
+
+> **Важно!** При включенной интеграции Remnawave установите лимит IP равный лимиту HWID в панели! 
+
+```yaml
+# config.yaml в папке с docker-compose главного сервера
+remnawave:
+  enabled: true
+  url: "https://panel.example.xyz"
+  api_key: "eyJhbGciOiJIUzI1NiIsInR5cCI..."
+
+  egames_cookies:
+    enabled: true
+    name: "OmrbMSfs"
+    value: "OAASDBwT"
+  
+  # Пример получения cookie eGames (nginx.conf)
+  # OmrbMSfs=OAASDBwT
+  # = разделяет Name и Value
+  # 
+  # map $arg_OmrbMSfs $set_cookie_header {
+  #     "OAASDBwT" "OmrbMSfs=OAASDBwT;
+  #     default "";
+  #}
 
 ```
 
@@ -163,13 +198,13 @@ nats:
   token: CHANGE_ME # Установите тот же токен, что вы ставили на главном сервисе
 
 debug:
-  disable_block: false # Возможность отключения блокировок на агенте
+  disable_block: false # Возможность отключения блокировок на агенте (режим наблюдателя)
 ```
 
 <details>
 <summary>docker-compose.yaml на ноде</summary>
 
-```
+```yaml
 services:
   xray-ip-limiter-agent:
     image: ghcr.io/nf776/xray-ip-limiter-agent:latest

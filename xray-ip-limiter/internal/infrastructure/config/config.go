@@ -9,10 +9,11 @@ import (
 )
 
 type Config struct {
-	NATS     NATSConfig     `yaml:"nats"`
-	Redis    RedisConfig    `yaml:"redis"`
-	Service  ServiceConfig  `yaml:"service"`
-	Telegram TelegramConfig `yaml:"telegram"`
+	NATS      NATSConfig      `yaml:"nats"`
+	Redis     RedisConfig     `yaml:"redis"`
+	Service   ServiceConfig   `yaml:"service"`
+	Telegram  TelegramConfig  `yaml:"telegram"`
+	Remnawave RemnawaveConfig `yaml:"remnawave"`
 }
 
 type NATSConfig struct {
@@ -29,13 +30,26 @@ type RedisConfig struct {
 
 type ServiceConfig struct {
 	IPLimit     int           `yaml:"ip_limit" env-default:"2"`
-	BanDuration time.Duration `yaml:"ban_duration" env-default:"1m"`
+	BanDuration time.Duration `yaml:"ban_duration" env-default:"30s"`
 }
 
 type TelegramConfig struct {
 	Enabled  bool   `yaml:"enabled" env-default:"false"`
 	BotToken string `yaml:"bot_token"`
 	ChatID   string `yaml:"chat_id"`
+}
+
+type RemnawaveConfig struct {
+	Enabled       bool          `yaml:"enabled" env-default:"false"`
+	URL           string        `yaml:"url"`
+	ApiKey        string        `yaml:"api_key"`
+	EGamesCookies EGamesCookies `yaml:"egames_cookies"`
+}
+
+type EGamesCookies struct {
+	Enabled bool   `yaml:"enabled" env-default:"false"`
+	Name    string `yaml:"name"`
+	Value   string `yaml:"value"`
 }
 
 func MustLoad() *Config {

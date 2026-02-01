@@ -7,6 +7,10 @@ type BlockPublisher interface {
 }
 
 type Notifier interface {
-	NotifyLimitExceeded(ctx context.Context, userID string, ips []string, violationDuration string) error
+	NotifyLimitExceeded(ctx context.Context, userID string, ips []string, limit int, violationDuration string) error
 	NotifyStartup(ctx context.Context) error
+}
+
+type RemnawaveClient interface {
+	FetchUsersLimits(ctx context.Context) (map[int]int, error)
 }

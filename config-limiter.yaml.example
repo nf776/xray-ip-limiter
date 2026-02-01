@@ -1,7 +1,14 @@
 # config.yaml в папке с docker-compose главного сервера
 nats:
-  # Установите токен в конфиге и docker compose, а так же на всех нодах
+  url: ""
+  # Установите одинаковый токен в конфиге и docker compose, а так же на всех нодах
   token: "CHANGE_ME"
+  workers_count: 3
+
+redis:
+  addr: "redis:6379"
+  password: ""
+  db: 0
 
 service:
   ip_limit: 2
@@ -9,5 +16,15 @@ service:
 
 telegram:
   enabled: true
-  bot_token: ""
-  chat_id: ""
+  bot_token: "..."
+  chat_id: "..."
+
+remnawave:
+  enabled: true
+  url: "https://panel.example.xyz"
+  api_key: "eyJhbGciOiJIUzI1Ni..."
+
+  egames_cookies:
+    enabled: true
+    name: ""
+    value: ""

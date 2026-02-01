@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"xray-ip-limiter/internal/domain/entity"
@@ -11,11 +12,13 @@ import (
 )
 
 type IPLimiterConfig struct {
-	IPLimit     int
-	BanDuration time.Duration
+	IPLimit         int
+	BanDuration     time.Duration
+	RemnawaveSyncer bool
 }
 
 type IPLimiter struct {
+	limitsRepo    repository.LimitsRepository
 	sessionRepo   repository.SessionRepository
 	lockRepo      repository.LockRepository
 	violationRepo repository.ViolationRepository
@@ -25,6 +28,7 @@ type IPLimiter struct {
 }
 
 func NewIPLimiter(
+	limitsRepo repository.LimitsRepository,
 	sessionRepo repository.SessionRepository,
 	lockRepo repository.LockRepository,
 	violationRepo repository.ViolationRepository,
@@ -33,6 +37,7 @@ func NewIPLimiter(
 	config IPLimiterConfig,
 ) *IPLimiter {
 	return &IPLimiter{
+		limitsRepo:    limitsRepo,
 		sessionRepo:   sessionRepo,
 		lockRepo:      lockRepo,
 		violationRepo: violationRepo,
@@ -58,7 +63,27 @@ func (uc *IPLimiter) ProcessIPEvent(ctx context.Context, input IPEventInput) (*B
 		return nil, fmt.Errorf("failed to get user IPs: %w", err)
 	}
 
-	isViolating := uniqueIPCount > uc.config.IPLimit
+	var limit int
+	var exists bool
+
+	userIDint, err := strconv.Atoi(input.UserID)
+	if err == nil {
+		if uc.config.RemnawaveSyncer {
+			limit, exists = uc.limitsRepo.GetLimit(userIDint)
+			if !exists {
+				limit = uc.config.IPLimit
+			}
+			if limit == 0 {
+				return nil, nil
+			}
+		} else {
+			limit = uc.config.IPLimit
+		}
+	} else {
+		limit = uc.config.IPLimit
+	}
+
+	isViolating := uniqueIPCount > limit
 
 	if !isViolating {
 		if err := uc.violationRepo.ClearViolationStart(ctx, input.UserID); err != nil {
@@ -80,7 +105,7 @@ func (uc *IPLimiter) ProcessIPEvent(ctx context.Context, input IPEventInput) (*B
 		violationDuration = time.Since(startTime)
 	}
 
-	slog.Info("IP event processed",
+	slog.Debug("IP event processed",
 		slog.String("user_id", input.UserID),
 		slog.String("new_ip", input.IP),
 		slog.Int("unique_count", uniqueIPCount),
@@ -111,7 +136,7 @@ func (uc *IPLimiter) ProcessIPEvent(ctx context.Context, input IPEventInput) (*B
 		slog.String("violation_duration", violationDuration.Round(time.Second).String()),
 	)
 
-	if err := uc.notifier.NotifyLimitExceeded(ctx, input.UserID, ips, violationDuration.Round(time.Second).String()); err != nil {
+	if err := uc.notifier.NotifyLimitExceeded(ctx, input.UserID, ips, limit, violationDuration.Round(time.Second).String()); err != nil {
 		slog.Error("failed to send notification", slog.String("error", err.Error()))
 	}
 

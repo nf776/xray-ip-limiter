@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"sync"
 
+	"xray-ip-limiter/internal/infrastructure/clients"
 	"xray-ip-limiter/internal/infrastructure/config"
 	"xray-ip-limiter/internal/infrastructure/messaging"
 	"xray-ip-limiter/internal/infrastructure/notification"
@@ -22,6 +23,7 @@ type App struct {
 	natsClient *messaging.NATSClient
 	subscriber *messaging.NATSSubscriber
 	notifier   *notification.TelegramNotifier
+	syncer     *usecase.LimitSyncer
 }
 
 func Run(version string) error {
@@ -63,6 +65,27 @@ func New(cfg *config.Config) (*App, error) {
 	}
 	slog.Info("Connected to NATS")
 
+	var remnawaveSyncer bool = cfg.Remnawave.Enabled
+	var memoryLimiterRepo *persistence.MemoryLimitRepository
+	var syncer *usecase.LimitSyncer
+
+	if remnawaveSyncer {
+		memoryLimiterRepo = persistence.NewMemoryLimitRepository()
+
+		remnaClient := clients.NewRemnawaveClient(clients.RemnawaveConfig{
+			URL:          cfg.Remnawave.URL,
+			ApiKey:       cfg.Remnawave.ApiKey,
+			DefaultLimit: cfg.Service.IPLimit,
+			EGamesCookies: clients.CookiesConfig{
+				Enabled: cfg.Remnawave.EGamesCookies.Enabled,
+				Name:    cfg.Remnawave.EGamesCookies.Name,
+				Value:   cfg.Remnawave.EGamesCookies.Value,
+			},
+		})
+
+		syncer = usecase.NewLimitSyncer(remnaClient, memoryLimiterRepo)
+	}
+
 	publisher := messaging.NewNATSPublisher(natsClient.JetStream(), "xray-observer-block")
 
 	notifier := notification.NewTelegramNotifier(notification.TelegramConfig{
@@ -72,14 +95,16 @@ func New(cfg *config.Config) (*App, error) {
 	})
 
 	ipLimiter := usecase.NewIPLimiter(
+		memoryLimiterRepo,
 		redisRepo,
 		redisRepo,
 		redisRepo,
 		publisher,
 		notifier,
 		usecase.IPLimiterConfig{
-			IPLimit:     cfg.Service.IPLimit,
-			BanDuration: cfg.Service.BanDuration,
+			IPLimit:         cfg.Service.IPLimit,
+			BanDuration:     cfg.Service.BanDuration,
+			RemnawaveSyncer: remnawaveSyncer,
 		},
 	)
 
@@ -100,6 +125,7 @@ func New(cfg *config.Config) (*App, error) {
 		natsClient: natsClient,
 		subscriber: subscriber,
 		notifier:   notifier,
+		syncer:     syncer,
 	}, nil
 }
 
@@ -117,6 +143,11 @@ func (a *App) Start(ctx context.Context, version string) error {
 
 	var wg sync.WaitGroup
 	errChan := make(chan error, 1)
+	if a.syncer != nil {
+		wg.Go(func() {
+			a.syncer.Run(ctx)
+		})
+	}
 
 	wg.Go(func() {
 		if err := a.subscriber.Start(ctx); err != nil {
